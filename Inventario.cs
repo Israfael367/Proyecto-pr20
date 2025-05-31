@@ -1,7 +1,10 @@
 ﻿using System.Text.Json;
 using System.Collections.Generic;
-using System.Reflection;
+using System.IO;
+using System.Threading.Tasks;
 using ClaseNetMaui.Models;
+using System.Linq;
+using System;
 
 public class Inventario
 {
@@ -12,104 +15,105 @@ public class Inventario
     {
         productos = new List<Producto>();
         categorias = new List<Categoria>();
-
-        // 🔹 Cargar los productos desde el recurso embebido
-        CargarProductosDesdeRecurso();
     }
 
-    private void CargarProductosDesdeRecurso()
+    // Ruta al archivo JSON en la carpeta de datos de la app
+    public static string ObtenerRutaJson()
+    {
+        // Necesitas "using Microsoft.Maui.Storage;" en la parte superior
+        return Path.Combine(FileSystem.AppDataDirectory, "Productos.json");
+    }
+
+    // Método para cargar productos desde el archivo JSON local
+    public async Task CargarProductosDesdeArchivoAsync()
     {
         try
         {
-            // 🔹 Obtener el ensamblado actual
-            var assembly = typeof(Inventario).GetTypeInfo().Assembly;
+            string rutaArchivo = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Productos.json");
+            if (File.Exists(rutaArchivo))
+            {
+                string json = await File.ReadAllTextAsync(rutaArchivo);
+                var lista = JsonSerializer.Deserialize<List<Producto>>(json) ?? new List<Producto>();
 
-            // 🔹 Leer el contenido de `Productos.json` embebido en los recursos
-            var resourceName = "ClaseNetMaui.Resources.Raw.Productos.json";
-            using var reader = new StreamReader(assembly.GetManifestResourceStream(resourceName));
-            string json = reader.ReadToEnd();
-
-            // 🔹 Convertir el JSON en una lista de productos
-            productos = JsonSerializer.Deserialize<List<Producto>>(json) ?? new List<Producto>();
+                // Parche: asegura que todos los productos tengan una categoría válida
+                foreach (var p in lista)
+                {
+                    if (p.Categoria == null)
+                    {
+                        p.Categoria = new Categoria("Sin categoría");
+                    }
+                }
+                productos = lista;
+            }
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"Error al cargar productos desde recurso embebido: {ex.Message}");
+            Console.WriteLine($"Error al cargar productos: {ex.Message}");
+            productos = new List<Producto>();
         }
     }
 
-    public void EliminarProducto(string nombre)
+    public async Task CargarCategoriasDesdeArchivoAsync()
+    {
+        string rutaArchivo = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Categorias.json");
+        if (File.Exists(rutaArchivo))
+        {
+            string json = await File.ReadAllTextAsync(rutaArchivo);
+            categorias = JsonSerializer.Deserialize<List<Categoria>>(json) ?? new List<Categoria>();
+        }
+    }
+
+    // Método para guardar productos en el archivo JSON local
+    public async Task GuardarProductosEnArchivoAsync()
+    {
+        string rutaArchivo = ObtenerRutaJson();
+
+        try
+        {
+            var options = new JsonSerializerOptions
+            {
+                WriteIndented = true
+            };
+            using FileStream fs = File.Create(rutaArchivo);
+            await JsonSerializer.SerializeAsync(fs, productos, options);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error al guardar productos: {ex.Message}");
+        }
+    }
+
+    // Ejemplo de método para agregar un producto y guardar
+    public async Task AgregarProductoYGuardarAsync(Producto producto)
+    {
+        productos.Add(producto);
+        await GuardarProductosEnArchivoAsync();
+
+        // Actualizar categorías
+        if (producto.Categoria != null && !categorias.Any(c => c.Nombre == producto.Categoria.Nombre))
+        {
+            categorias.Add(producto.Categoria);
+        }
+    }
+
+    public static async Task CopiarJsonInicialSiNoExisteAsync()
+    {
+        var localPath = Path.Combine(FileSystem.AppDataDirectory, "Productos.json");
+        if (!File.Exists(localPath))
+        {
+#if ANDROID
+        using var stream = await FileSystem.OpenAppPackageFileAsync("Productos.json");
+        using var outFile = File.Create(localPath);
+        await stream.CopyToAsync(outFile);
+#endif
+            // Puedes agregar #elif para otras plataformas si tu app es multiplataforma
+        }
+    }
+
+    // Ejemplo de método para eliminar un producto y guardar
+    public async Task EliminarProductoYGuardarAsync(string nombre)
     {
         productos.RemoveAll(p => p.Nombre.Equals(nombre, StringComparison.OrdinalIgnoreCase));
-    }
-
-    public Categoria BuscarCategoria(string nombre)
-    {
-        return categorias.FirstOrDefault(c => c.Nombre.Equals(nombre, StringComparison.OrdinalIgnoreCase));
-    }
-
-    public List<Producto> ListarProductosPorCategoria(string nombreCategoria)
-    {
-        return productos.Where(p => p.Categoria.Nombre.Equals(nombreCategoria, StringComparison.OrdinalIgnoreCase)).ToList();
-    }
-
-    public Producto BuscarProducto(string nombre)
-    {
-        return productos.FirstOrDefault(p => p.Nombre.Equals(nombre, StringComparison.OrdinalIgnoreCase));
-    }
-
-    public void ActualizarStock(string nombre, int nuevaCantidad)
-    {
-        Producto producto = BuscarProducto(nombre);
-        if (producto != null)
-        {
-            producto.Cantidad = nuevaCantidad;
-        }
-    }
-
-    public void AgregarProductoConPropiedades(string nombre, string descripcion, int cantidad, float precio, string nombreCategoria, Dictionary<string, string> propiedades)
-    {
-        Categoria categoria = BuscarCategoria(nombreCategoria) ?? new Categoria(nombreCategoria);
-
-        Producto nuevoProducto = new Producto(nombre, descripcion, cantidad, precio, categoria)
-        {
-            PropiedadesEspecificas = new SortedDictionary<string, string>(propiedades)
-        };
-
-        productos.Add(nuevoProducto);
-    }
-
-    public bool EditarProducto(string nombre, string nuevaDescripcion, int nuevaCantidad, float nuevoPrecio, string nuevaCategoria, Dictionary<string, string> nuevasPropiedades)
-    {
-        Producto producto = BuscarProducto(nombre);
-        if (producto != null)
-        {
-            producto.Descripcion = nuevaDescripcion;
-            producto.Cantidad = nuevaCantidad;
-            producto.Precio = nuevoPrecio;
-
-            if (!producto.Categoria.Nombre.Equals(nuevaCategoria, StringComparison.OrdinalIgnoreCase))
-            {
-                producto.Categoria = BuscarCategoria(nuevaCategoria) ?? new Categoria(nuevaCategoria);
-            }
-
-            producto.PropiedadesEspecificas.Clear();
-            foreach (var propiedad in nuevasPropiedades)
-            {
-                producto.PropiedadesEspecificas[propiedad.Key] = propiedad.Value;
-            }
-
-            return true;
-        }
-
-        return false;
-    }
-
-    public void AgregarCategoria(string nombreCategoria)
-    {
-        if (!categorias.Any(c => c.Nombre.Equals(nombreCategoria, StringComparison.OrdinalIgnoreCase)))
-        {
-            categorias.Add(new Categoria(nombreCategoria));
-        }
+        await GuardarProductosEnArchivoAsync();
     }
 }

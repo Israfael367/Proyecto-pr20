@@ -14,12 +14,15 @@
             <Label Text="Descripción del Producto:" FontSize="12"/>
             <Editor x:Name="EdNote"/>
 
-            <Label Text="Categoria del Producto:" FontSize="12"/>
-            <Editor x:Name="ECate"/>
+            <Label Text="Categoría del Producto:" FontSize="12"/>
+            <Picker x:Name="PCategoria" Title="Selecciona una categoría"
+                    SelectedIndexChanged="PCategoria_SelectedIndexChanged"/>
+
+            <Label Text="Subcategoría:" FontSize="12"/>
+            <Picker x:Name="PSubcategoria" Title="Selecciona una subcategoría"/>
 
             <Button Text="Guardar" x:Name="BtnSave" Clicked="BtnSave_Clicked"/>
             <Button Text="Eliminar" x:Name="BtnDelete" Clicked="BtnDelete_Clicked"/>
         </VerticalStackLayout>
     </ScrollView>
-
 </ContentPage>

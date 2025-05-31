@@ -15,15 +15,9 @@
             <!-- Entrada de búsqueda -->
             <Entry Placeholder="Buscar" PlaceholderColor="#960202" Completed="ESearch_Completed" x:Name="ESearch"/>
 
-            <!-- Mensaje si la lista está vacía -->
-            <Label Text="No hay productos disponibles" 
-                   TextColor="White" 
-                   FontSize="16"
-                   IsVisible="{Binding Source={x:Reference LV}, Path=ItemsSource.Count, Converter={StaticResource EmptyListVisibilityConverter}}" />
-
             <!-- ListView para mostrar los productos -->
             <ListView x:Name="LV" ItemTapped="LV_ItemTapped" SeparatorColor="#960202"
-                      ItemsSource="{Binding listaProductos, Source={x:Reference MainPage}}">
+                      ItemsSource="{Binding listaProductos}">
                 <ListView.ItemTemplate>
                     <DataTemplate>
                         <ViewCell>
@@ -31,7 +25,7 @@
                                 <VerticalStackLayout Grid.Row="0" Grid.Column="1" Spacing="5">
                                     <Label Text="{Binding Nombre}" TextColor="White"/>
                                     <Label Text="{Binding Descripcion}" TextColor="Gray"/>
-                                    <!-- Aquí se muestra la categoría correctamente -->
+                                    <!-- Muestra la categoría correctamente -->
                                     <Label Text="{Binding Categoria.Nombre, StringFormat='Categoría: {0}'}" TextColor="#FFB300"/>
                                 </VerticalStackLayout>
                             </Grid>
